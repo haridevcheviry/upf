@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-upf
+  labels:
+    app: {{ template "dpdkchart.name" . }}
+    chart: {{ template "dpdkchart.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+{{- with .Values.upf.annotations }}
+  annotations:
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  replicas:  {{ .Values.upf.replicas }}
+  selector:
+    matchLabels:
+      app: {{ template "dpdkchart.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "dpdkchart.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      volumes:
+        - name: hugepage
+          emptyDir:
+            medium: HugePages
+        - hostPath:
+            path: "/sys/devices"
+          name: sysdevices
+      containers:
+        - name: upf
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/bin/bash", "-c", "--"]
+          args: [ "while true; do sleep 30; done;" ]
+          workingDir: /root/pktgen
+          securityContext:
+            capabilities:
+              add:
+                - IPC_LOCK
+                - NET_ADMIN
+                - SYS_NICE
+                - SYS_ADMIN
+            privileged: true
+            allowPrivilegeEscalation: true
+          volumeMounts:
+          - mountPath: /mnt/huge
+            name: hugepage
+          - name: sysdevices
+            mountPath: /sys/devices
+            readOnly: false
+          resources:
+{{ toYaml .Values.upf.resources | indent 12 }}
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}
